@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>USB 探测 · 手柄控制</title>
+<link rel="stylesheet" href="style.css">
+<style>
+  .mono { font-family: "Cascadia Mono", Consolas, monospace; font-size: 11.5px; }
+  .row2 { display: grid; grid-template-columns: 90px 90px 1fr; gap: 8px; }
+  .devlist { display: flex; flex-direction: column; gap: 6px; margin-top: 10px; }
+  .devitem {
+    display: flex; align-items: center; gap: 10px;
+    padding: 8px 12px; border-radius: 10px;
+    background: var(--surface-2); border: 1px solid var(--line);
+    font-size: 12px;
+  }
+  .devitem .vv { color: var(--dim); font-family: monospace; }
+  .devitem button { margin-left: auto; }
+  .cols { margin: 6px 0 0 0; padding-left: 16px; color: var(--dim); font-size: 11.5px; }
+  .cols li { margin: 2px 0; }
+  .kbd { padding: 1px 5px; border: 1px solid var(--line-hi); border-radius: 4px; font-size: 11px; }
+</style>
+</head>
+<body>
+
+<header class="topbar">
+  <div class="brand"><span class="mark">GP</span>USB 探测</div>
+  <span class="pill"><span class="dot" id="dot"></span><span id="state">未授权</span></span>
+  <span class="spacer"></span>
+  <a class="btn ghost" href="../index.html">返回配置</a>
+  <button class="btn primary" id="btnPick">选择 HID 设备</button>
+</header>
+
+<main class="wrap">
+  <div class="grid">
+    <div style="display:flex;flex-direction:column;gap:12px;min-width:0">
+
+      <section class="card">
+        <header class="card-head"><h2>已授权设备</h2><span class="meta" id="cnt"></span></header>
+        <div class="devlist" id="devlist"><div class="hint">还没有设备。点右上角「选择 HID 设备」。</div></div>
+      </section>
+
+      <section class="card">
+        <header class="card-head"><h2>发送报告</h2></header>
+        <div class="row2">
+          <div class="field" style="margin:0">
+            <div class="lb"><span>报告 ID</span></div>
+            <input id="rid" class="mono" value="0" style="width:100%;background:var(--surface-2);border:1px solid var(--line);border-radius:8px;height:34px;padding:0 10px;color:var(--text)">
+          </div>
+          <div class="field" style="margin:0">
+            <div class="lb"><span>长度</span></div>
+            <input id="rlen" class="mono" value="8" style="width:100%;background:var(--surface-2);border:1px solid var(--line);border-radius:8px;height:34px;padding:0 10px;color:var(--text)">
+          </div>
+          <div class="field" style="margin:0">
+            <div class="lb"><span>载荷（十六进制）</span></div>
+            <input id="rhex" class="mono" value="00 00 00 00 00 00 00 00" style="width:100%;background:var(--surface-2);border:1px solid var(--line);border-radius:8px;height:34px;padding:0 10px;color:var(--text)">
+          </div>
+        </div>
+        <div class="row mt">
+          <button class="btn primary" id="btnSend">发送 Output Report</button>
+          <button class="btn" id="btnFeature">读 Feature Report</button>
+          <span class="hint" style="margin:0">只读探测优先，写之前先确认端点</span>
+        </div>
+      </section>
+
+      <section class="card">
+        <header class="card-head"><h2>收包日志</h2><span class="meta"><button class="linkbtn" id="btnClear">清空</button></span></header>
+        <div class="log" id="log" style="height:150px"></div>
+      </section>
+    </div>
+
+    <aside class="side">
+      <section class="card">
+        <header class="card-head"><h2>说明</h2></header>
+        <p class="hint" style="margin-top:0">
+          WebHID 只能访问 <b>厂商自定义集合</b>（usage page ≥ 0xFF00）。
+          标准键盘/鼠标集合被浏览器禁止，这是防按键记录的安全策略。
+        </p>
+        <p class="hint">
+          如果设备只列出标准集合，说明它没有开放配置通道，
+          USB 侧改配置这条路就走不通。
+        </p>
+      </section>
+    </aside>
+  </div>
+</main>
+
+<script src="hid.js?v=202610291642"></script>
+<script>
+(function () {
+  'use strict';
+  const $ = (id) => document.getElementById(id);
+  const H = window.GSHID;
+  let active = null;
+
+  function log(msg, cls) {
+    const d = document.createElement('div');
+    d.innerHTML = `<span class="t">${new Date().toLocaleTimeString('zh-CN')}</span> ` +
+      `<span class="${cls || ''}">${msg}</span>`;
+    $('log').appendChild(d);
+    $('log').scrollTop = $('log').scrollHeight;
+  }
+
+  function hex(bytes) {
+    return Array.from(bytes).map((b) => b.toString(16).padStart(2, '0')).join(' ');
+  }
+
+  async function refresh() {
+    if (!H.supported()) {
+      $('state').textContent = '浏览器不支持 WebHID';
+      $('dot').className = 'dot';
+      return;
+    }
+    const devices = await H.list();
+    $('cnt').textContent = devices.length + ' 个';
+    const box = $('devlist');
+    if (!devices.length) {
+      box.innerHTML = '<div class="hint">还没有设备。点右上角「选择 HID 设备」。</div>';
+      return;
+    }
+    box.innerHTML = '';
+    devices.forEach((d, i) => {
+      const el = document.createElement('div');
+      el.className = 'devitem';
+      const cols = d.collections.map((c) =>
+        `<li>usagePage <b>0x${c.usagePage.toString(16).toUpperCase()}</b> · usage 0x${c.usage.toString(16)} · 输入 ${c.inputReports.length} / 输出 ${c.outputReports.length} / 特性 ${c.featureReports.length}</li>`
+      ).join('');
+      el.innerHTML =
+        `<div><div>${d.productName || '(无名称)'}</div>` +
+        `<div class="vv">VID 0x${d.vendorId.toString(16)} · PID 0x${d.productId.toString(16)}</div>` +
+        `<ul class="cols">${cols || '<li>无集合信息</li>'}</ul></div>`;
+      const btn = document.createElement('button');
+      btn.className = 'btn mini primary';
+      btn.textContent = '设为当前';
+      btn.onclick = async () => {
+        await H.open(d);
+        active = d;
+        $('state').textContent = '已打开 ' + (d.productName || '');
+        $('dot').className = 'dot on';
+        H.onInput((data) => log('IN  ' + hex(data), 'rx'));
+        log('已打开 ' + (d.productName || '') + '，监听输入报告', 'rx');
+      };
+      el.appendChild(btn);
+      box.appendChild(el);
+    });
+  }
+
+  $('btnPick').onclick = async () => {
+    try {
+      await H.pick();
+      await refresh();
+    } catch (e) {
+      log('选择失败：' + (e.message || e), 'er');
+    }
+  };
+
+  $('btnSend').onclick = async () => {
+    if (!active) { log('先在列表里点「设为当前」', 'er'); return; }
+    const rid = parseInt($('rid').value, 10) || 0;
+    const hexStr = $('rhex').value.trim().replace(/[,\s]+/g, '');
+    const bytes = [];
+    for (let i = 0; i < hexStr.length; i += 2) bytes.push(parseInt(hexStr.slice(i, i + 2), 16));
+    const len = parseInt($('rlen').value, 10) || bytes.length;
+    while (bytes.length < len) bytes.push(0);
+    const payload = new Uint8Array(bytes.slice(0, len));
+    log('OUT id=' + rid + ' · ' + hex(payload), 'tx');
+    try {
+      await H.send(rid, payload);
+      log('已发送', 'rx');
+    } catch (e) {
+      log('发送失败：' + (e.message || e), 'er');
+    }
+  };
+
+  $('btnFeature').onclick = async () => {
+    if (!active) { log('先设为当前设备', 'er'); return; }
+    const rid = parseInt($('rid').value, 10) || 0;
+    try {
+      const data = await H.readFeature(rid);
+      log('FEATURE id=' + rid + ' → ' + hex(data), 'rx');
+    } catch (e) {
+      log('读 Feature 失败：' + (e.message || e), 'er');
+    }
+  };
+
+  $('btnClear').onclick = () => { $('log').innerHTML = ''; };
+
+  refresh();
+})();
+</script>
+</body>
+</html>
