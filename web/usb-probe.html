@@ -8,18 +8,30 @@
 <style>
   .mono { font-family: "Cascadia Mono", Consolas, monospace; font-size: 11.5px; }
   .row2 { display: grid; grid-template-columns: 90px 90px 1fr; gap: 8px; }
-  .devlist { display: flex; flex-direction: column; gap: 6px; margin-top: 10px; }
+  .devlist { display: flex; flex-direction: column; gap: 8px; margin-top: 10px; }
   .devitem {
-    display: flex; align-items: center; gap: 10px;
-    padding: 8px 12px; border-radius: 10px;
+    padding: 10px 14px; border-radius: 10px;
     background: var(--surface-2); border: 1px solid var(--line);
     font-size: 12px;
   }
-  .devitem .vv { color: var(--dim); font-family: monospace; }
-  .devitem button { margin-left: auto; }
-  .cols { margin: 6px 0 0 0; padding-left: 16px; color: var(--dim); font-size: 11.5px; }
-  .cols li { margin: 2px 0; }
-  .kbd { padding: 1px 5px; border: 1px solid var(--line-hi); border-radius: 4px; font-size: 11px; }
+  .devtop { display: flex; align-items: center; gap: 10px; }
+  .devtop .vv { color: var(--dim); font-family: monospace; font-size: 11px; }
+  .devtop button { margin-left: auto; }
+  .cols { margin: 8px 0 0 0; padding: 0; list-style: none; }
+  .cols li { margin: 3px 0; color: var(--dim); font-size: 11.5px; }
+  .cols .up { color: var(--text); font-family: monospace; }
+  .rep {
+    display: inline-block; margin: 2px 4px 2px 0; padding: 1px 7px;
+    border: 1px solid var(--line-hi); border-radius: 5px;
+    font-family: monospace; font-size: 10.5px; color: var(--dim);
+    cursor: pointer;
+  }
+  .rep:hover { border-color: var(--accent); color: var(--accent-hi); }
+  .rep.out { border-color: rgba(99,102,241,.5); color: var(--accent-hi); }
+  .inp {
+    width: 100%; background: var(--surface-2); border: 1px solid var(--line);
+    border-radius: 8px; height: 34px; padding: 0 10px; color: var(--text);
+  }
 </style>
 </head>
 <body>
@@ -38,35 +50,35 @@
 
       <section class="card">
         <header class="card-head"><h2>已授权设备</h2><span class="meta" id="cnt"></span></header>
-        <div class="devlist" id="devlist"><div class="hint">还没有设备。点右上角「选择 HID 设备」。</div></div>
+        <div class="devlist" id="devlist"></div>
       </section>
 
       <section class="card">
-        <header class="card-head"><h2>发送报告</h2></header>
+        <header class="card-head"><h2>发送报告</h2><span class="meta">点上面的报告标签可自动填入</span></header>
         <div class="row2">
           <div class="field" style="margin:0">
             <div class="lb"><span>报告 ID</span></div>
-            <input id="rid" class="mono" value="0" style="width:100%;background:var(--surface-2);border:1px solid var(--line);border-radius:8px;height:34px;padding:0 10px;color:var(--text)">
+            <input id="rid" class="mono inp" value="0">
           </div>
           <div class="field" style="margin:0">
             <div class="lb"><span>长度</span></div>
-            <input id="rlen" class="mono" value="8" style="width:100%;background:var(--surface-2);border:1px solid var(--line);border-radius:8px;height:34px;padding:0 10px;color:var(--text)">
+            <input id="rlen" class="mono inp" value="8">
           </div>
           <div class="field" style="margin:0">
             <div class="lb"><span>载荷（十六进制）</span></div>
-            <input id="rhex" class="mono" value="00 00 00 00 00 00 00 00" style="width:100%;background:var(--surface-2);border:1px solid var(--line);border-radius:8px;height:34px;padding:0 10px;color:var(--text)">
+            <input id="rhex" class="mono inp" value="00 00 00 00 00 00 00 00">
           </div>
         </div>
         <div class="row mt">
           <button class="btn primary" id="btnSend">发送 Output Report</button>
           <button class="btn" id="btnFeature">读 Feature Report</button>
-          <span class="hint" style="margin:0">只读探测优先，写之前先确认端点</span>
+          <span class="hint" style="margin:0">读写前必须「设为当前」</span>
         </div>
       </section>
 
       <section class="card">
         <header class="card-head"><h2>收包日志</h2><span class="meta"><button class="linkbtn" id="btnClear">清空</button></span></header>
-        <div class="log" id="log" style="height:150px"></div>
+        <div class="log" id="log" style="height:170px"></div>
       </section>
     </div>
 
@@ -75,18 +87,18 @@
         <header class="card-head"><h2>说明</h2></header>
         <p class="hint" style="margin-top:0">
           WebHID 只能访问 <b>厂商自定义集合</b>（usage page ≥ 0xFF00）。
-          标准键盘/鼠标集合被浏览器禁止，这是防按键记录的安全策略。
+          标准键盘/鼠标集合被浏览器禁止。
         </p>
         <p class="hint">
-          如果设备只列出标准集合，说明它没有开放配置通道，
-          USB 侧改配置这条路就走不通。
+          发送失败通常是<b>报告 ID 或长度不对</b>。
+          点上面集合里的报告标签（如 <span class="rep out">out id=7 · 7B</span>）会自动填入正确参数。
         </p>
       </section>
     </aside>
   </div>
 </main>
 
-<script src="hid.js?v=202610291642"></script>
+<script src="hid.js?v=202610291657"></script>
 <script>
 (function () {
   'use strict';
@@ -96,63 +108,94 @@
 
   function log(msg, cls) {
     const d = document.createElement('div');
-    d.innerHTML = `<span class="t">${new Date().toLocaleTimeString('zh-CN')}</span> ` +
-      `<span class="${cls || ''}">${msg}</span>`;
+    d.innerHTML = `<span class="t">${new Date().toLocaleTimeString('zh-CN')}</span> <span class="${cls || ''}">${msg}</span>`;
     $('log').appendChild(d);
     $('log').scrollTop = $('log').scrollHeight;
   }
+  const hex = (b) => Array.from(b).map((x) => x.toString(16).padStart(2, '0')).join(' ');
 
-  function hex(bytes) {
-    return Array.from(bytes).map((b) => b.toString(16).padStart(2, '0')).join(' ');
+  function reportBytes(r) {
+    let bits = 0;
+    (r.items || []).forEach((it) => { bits += (it.reportSize || 0) * (it.reportCount || 0); });
+    return Math.ceil(bits / 8);
+  }
+
+  function fillForm(id, bytes) {
+    $('rid').value = id;
+    $('rlen').value = bytes;
+    $('rhex').value = new Array(bytes).fill('00').join(' ');
+  }
+
+  function renderReports(list, kind) {
+    if (!list || !list.length) return '';
+    return list.map((r) => {
+      const n = reportBytes(r);
+      const cls = kind === 'out' ? 'rep out' : 'rep';
+      const tag = kind === 'out' ? 'out' : (kind === 'in' ? 'in' : 'feat');
+      return `<span class="${cls}" data-id="${r.reportId}" data-len="${n}">${tag} id=${r.reportId} · ${n}B</span>`;
+    }).join(' ');
   }
 
   async function refresh() {
     if (!H.supported()) {
       $('state').textContent = '浏览器不支持 WebHID';
-      $('dot').className = 'dot';
       return;
     }
     const devices = await H.list();
     $('cnt').textContent = devices.length + ' 个';
     const box = $('devlist');
+    box.innerHTML = '';
     if (!devices.length) {
       box.innerHTML = '<div class="hint">还没有设备。点右上角「选择 HID 设备」。</div>';
       return;
     }
-    box.innerHTML = '';
-    devices.forEach((d, i) => {
+    devices.forEach((d) => {
       const el = document.createElement('div');
       el.className = 'devitem';
-      const cols = d.collections.map((c) =>
-        `<li>usagePage <b>0x${c.usagePage.toString(16).toUpperCase()}</b> · usage 0x${c.usage.toString(16)} · 输入 ${c.inputReports.length} / 输出 ${c.outputReports.length} / 特性 ${c.featureReports.length}</li>`
-      ).join('');
+
+      const cols = (d.collections || []).map((c) => {
+        const vendor = c.usagePage >= 0xFF00;
+        const outs = renderReports(c.outputReports, 'out');
+        const ins = renderReports(c.inputReports, 'in');
+        const fes = renderReports(c.featureReports, 'feat');
+        return `<li>usagePage <span class="up">0x${c.usagePage.toString(16).toUpperCase()}</span> · usage 0x${c.usage.toString(16)}` +
+          `${vendor ? ' · <b style="color:var(--accent-hi)">厂商</b>' : ''}<br>${outs || ''} ${ins || ''} ${fes || ''}` +
+          `${!outs && !ins && !fes ? '<span style="color:var(--mute)">无报告</span>' : ''}</li>`;
+      }).join('');
+
       el.innerHTML =
-        `<div><div>${d.productName || '(无名称)'}</div>` +
-        `<div class="vv">VID 0x${d.vendorId.toString(16)} · PID 0x${d.productId.toString(16)}</div>` +
-        `<ul class="cols">${cols || '<li>无集合信息</li>'}</ul></div>`;
+        `<div class="devtop"><div><div>${d.productName || '(无名称)'}</div>` +
+        `<div class="vv">VID 0x${d.vendorId.toString(16)} · PID 0x${d.productId.toString(16)}</div></div></div>` +
+        `<ul class="cols">${cols || '<li>无集合信息</li>'}</ul>`;
+
       const btn = document.createElement('button');
       btn.className = 'btn mini primary';
       btn.textContent = '设为当前';
       btn.onclick = async () => {
-        await H.open(d);
-        active = d;
-        $('state').textContent = '已打开 ' + (d.productName || '');
-        $('dot').className = 'dot on';
-        H.onInput((data) => log('IN  ' + hex(data), 'rx'));
-        log('已打开 ' + (d.productName || '') + '，监听输入报告', 'rx');
+        try {
+          await H.open(d);
+          active = d;
+          $('state').textContent = d.productName || '已打开';
+          $('dot').className = 'dot on';
+          H.onInput((data, rid) => log('IN id=' + rid + ' · ' + hex(data), 'rx'));
+          log('已打开 ' + (d.productName || ''), 'rx');
+        } catch (e) {
+          log('打开失败：' + (e.message || e), 'er');
+        }
       };
-      el.appendChild(btn);
+      el.querySelector('.devtop').appendChild(btn);
+
+      el.querySelectorAll('.rep').forEach((sp) => {
+        sp.onclick = () => fillForm(sp.dataset.id, Number(sp.dataset.len));
+      });
+
       box.appendChild(el);
     });
   }
 
   $('btnPick').onclick = async () => {
-    try {
-      await H.pick();
-      await refresh();
-    } catch (e) {
-      log('选择失败：' + (e.message || e), 'er');
-    }
+    try { await H.pick(); await refresh(); }
+    catch (e) { log('选择失败：' + (e.message || e), 'er'); }
   };
 
   $('btnSend').onclick = async () => {
@@ -160,14 +203,14 @@
     const rid = parseInt($('rid').value, 10) || 0;
     const hexStr = $('rhex').value.trim().replace(/[,\s]+/g, '');
     const bytes = [];
-    for (let i = 0; i < hexStr.length; i += 2) bytes.push(parseInt(hexStr.slice(i, i + 2), 16));
+    for (let i = 0; i < hexStr.length; i += 2) bytes.push(parseInt(hexStr.slice(i, i + 2), 16) || 0);
     const len = parseInt($('rlen').value, 10) || bytes.length;
     while (bytes.length < len) bytes.push(0);
     const payload = new Uint8Array(bytes.slice(0, len));
-    log('OUT id=' + rid + ' · ' + hex(payload), 'tx');
+    log('OUT id=' + rid + ' len=' + len + ' · ' + hex(payload), 'tx');
     try {
       await H.send(rid, payload);
-      log('已发送', 'rx');
+      log('✅ 发送成功', 'rx');
     } catch (e) {
       log('发送失败：' + (e.message || e), 'er');
     }
