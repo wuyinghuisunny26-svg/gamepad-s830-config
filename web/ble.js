@@ -53,11 +53,18 @@
     }
 
     state('choosing', '请在弹出的窗口里选择手柄');
-    device = await navigator.bluetooth.requestDevice({
-      filters: [{ namePrefix: 'mingpin' }, { namePrefix: 'MINGPIN' }],
+    var req = {
       optionalServices: [SVC, '0000ffff-0000-1000-8000-00805f9b34fb',
                          '91680001-1111-6666-8888-0123456789ab']
-    });
+    };
+    if (opts.wide) {
+      // 通用入口：列出附近所有 BLE 设备，连上后再校验是否受支持
+      req.acceptAllDevices = true;
+    } else {
+      // 默认入口：只显示 mingpin 系列，避免列表里一堆无关设备
+      req.filters = [{ namePrefix: 'mingpin' }, { namePrefix: 'MINGPIN' }];
+    }
+    device = await navigator.bluetooth.requestDevice(req);
 
     device.addEventListener('gattserverdisconnected', function () {
       chWrite = null; chNotify = null;
@@ -66,7 +73,14 @@
 
     state('connecting', '正在连接 ' + (device.name || ''));
     var server = await device.gatt.connect();
-    var service = await server.getPrimaryService(SVC);
+
+    var service;
+    try {
+      service = await server.getPrimaryService(SVC);
+    } catch (e) {
+      try { server.disconnect(); } catch (e2) { /* ignore */ }
+      throw new Error('这个设备没有手柄配置服务（95990001），不是受支持的手柄');
+    }
     chWrite = await service.getCharacteristic(CH_WRITE);
     chNotify = await service.getCharacteristic(CH_NOTIFY);
 

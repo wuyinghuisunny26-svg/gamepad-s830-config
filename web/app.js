@@ -117,6 +117,7 @@
     busy: false,
     draft: JSON.parse(JSON.stringify(DEFAULT_DRAFT)),
     turbo: {},          // { 按键id: {mode, cycle} }
+    supported: null,    // null 未知 / true 可写 / false 协议版本未验证
     baseline: JSON.parse(JSON.stringify(DEFAULT_DRAFT)),
     selected: null,          // 选中的手柄按键 id
     editing: null,           // 编辑中的 {key, mods}
@@ -152,10 +153,10 @@
     $('btnSave').disabled = !ok || !hasChanges();
   }
 
-  async function connect() {
+  async function connect(wide) {
     setConn(false, '连接中…', 'busy');
     try {
-      const info = await BLE.connect({ onFrame: handleFrame, onState: onBleState });
+      const info = await BLE.connect({ wide: !!wide, onFrame: handleFrame, onState: onBleState });
       state.connected = true;
       setConn(true, '已连接 · ' + (info.name || ''));
       log('已连接 ' + (info.name || ''));
@@ -184,6 +185,9 @@
   function disconnect() {
     BLE.disconnect();
     state.device = null;
+    state.supported = null;
+    const bar = $('compatBar');
+    if (bar) bar.style.display = 'none';
     setConn(false, '未连接');
     renderDevice();
     log('已断开');
@@ -217,6 +221,7 @@
       });
       renderDevice();
       log('能力包：deviceType=' + p[0] + '　mapVersion=' + p[1]);
+      checkCompat();
       return;
     }
 
@@ -426,11 +431,32 @@
   }
 
   function updateSaveBtn() {
-    $('btnSave').disabled = !state.connected || !hasChanges();
+    $('btnSave').disabled = !state.connected || !hasChanges() || state.supported === false;
+  }
+
+  // 协议版本校验：只有 mapVersion = 4 才允许写入
+  function checkCompat() {
+    const mv = state.device && state.device.mapVersion;
+    const bar = $('compatBar');
+    if (!bar) return;
+    if (mv == null) { state.supported = null; bar.style.display = 'none'; updateSaveBtn(); return; }
+    if (mv === 4) {
+      state.supported = true;
+      bar.style.display = 'none';
+      log('协议版本 v' + mv + '，支持写入');
+    } else {
+      state.supported = false;
+      bar.style.display = '';
+      bar.innerHTML = '检测到协议版本 <b>v' + mv + '</b>，本工具只在 <b>v4</b> 上验证过。'
+        + '为避免写坏配置，已禁用写入，只展示设备信息。';
+      log('协议版本 v' + mv + ' 未验证，写入已禁用', 'er');
+    }
+    updateSaveBtn();
   }
 
   async function saveToDevice() {
     if (!BLE.isConnected()) { log('未连接，无法写入', 'er'); return; }
+    if (state.supported === false) { log('当前协议版本未验证，写入已禁用', 'er'); return; }
 
     const pairs = {};
     BUTTONS.forEach((b) => {
@@ -515,7 +541,8 @@
 
   // ---------- 绑定 ----------
   function bind() {
-    $('btnConnect').onclick = connect;
+    $('btnConnect').onclick = () => connect(false);
+    $('btnConnectWide').onclick = () => connect(true);
     $('btnDisconnect').onclick = disconnect;
     $('btnApply').onclick = applyDraft;
     document.querySelectorAll('#turboSeg button').forEach((btn) => {
