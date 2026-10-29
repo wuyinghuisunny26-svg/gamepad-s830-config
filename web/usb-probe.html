@@ -98,7 +98,7 @@
   </div>
 </main>
 
-<script src="hid.js?v=202610291657"></script>
+<script src="hid.js?v=202610291658"></script>
 <script>
 (function () {
   'use strict';
@@ -139,6 +139,8 @@
   async function refresh() {
     if (!H.supported()) {
       $('state').textContent = '浏览器不支持 WebHID';
+      $('devlist').innerHTML =
+        '<div class="hint">当前浏览器没有 WebHID 接口。请用 <b>Edge 或 Chrome</b> 打开本页（不是 IE 内核，也不是微信内置浏览器）。</div>';
       return;
     }
     const devices = await H.list();
