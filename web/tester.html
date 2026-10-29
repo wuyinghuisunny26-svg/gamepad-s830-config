@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>按键测试 · 手柄控制</title>
+<link rel="stylesheet" href="style.css">
+<style>
+  .wrap { max-width: 760px; }
+  .big { font-size: 34px; font-weight: 700; letter-spacing: 1px; }
+  .idx { color: var(--accent-hi); }
+  .list { display: grid; grid-template-columns: repeat(auto-fill, minmax(92px, 1fr)); gap: 7px; margin-top: 14px; }
+  .cell {
+    padding: 8px 10px; border-radius: 10px; text-align: center;
+    background: var(--panel-2); border: 1px solid var(--border);
+    font-size: 12px; color: var(--mute); transition: .08s;
+  }
+  .cell.on { background: rgba(55,211,153,.18); border-color: var(--ok); color: var(--ok); font-weight: 700; }
+  .axis { font-family: "Cascadia Mono", Consolas, monospace; font-size: 12px; color: #8fa2bd; }
+  .warn { color: var(--warn); }
+</style>
+</head>
+<body>
+<header class="topbar">
+  <div class="brand"><span class="mark">GP</span>按键测试</div>
+  <span class="pill"><span class="dot" id="dot"></span><span id="state">等待手柄</span></span>
+  <span class="spacer"></span>
+  <a class="btn" href="../index.html">返回配置</a>
+</header>
+
+<div class="wrap" style="margin:0 auto;padding:22px 28px 60px">
+  <section class="card">
+    <h2>当前按下 <span class="right">Gamepad API</span></h2>
+    <div class="big" id="cur">—</div>
+    <div class="hint">
+      把手柄连到电脑后，按任意键唤醒。这里的“按钮 N”对应手柄内部的按键编号，
+      按下去会显示序号和值。
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>全部按键状态 <span class="right" id="cnt"></span></h2>
+    <div class="list" id="grid"></div>
+  </section>
+
+  <section class="card">
+    <h2>摇杆 / 扳机</h2>
+    <div class="axis" id="axes">—</div>
+    <div class="hint warn" id="tip"></div>
+  </section>
+</div>
+
+<script>
+(function () {
+  'use strict';
+  const $ = (id) => document.getElementById(id);
+  const grid = $('grid');
+  let cells = [];
+
+  function buildGrid(n) {
+    grid.innerHTML = '';
+    cells = [];
+    for (let i = 0; i < n; i++) {
+      const d = document.createElement('div');
+      d.className = 'cell';
+      d.textContent = 'N' + i;
+      grid.appendChild(d);
+      cells.push(d);
+    }
+    $('cnt').textContent = n + ' 个按钮';
+  }
+
+  function poll() {
+    const pads = navigator.getGamepads ? navigator.getGamepads() : [];
+    let pad = null;
+    for (const p of pads) { if (p) { pad = p; break; } }
+
+    if (!pad) {
+      $('dot').className = 'dot';
+      $('state').textContent = '等待手柄';
+      $('cur').textContent = '—';
+      requestAnimationFrame(poll);
+      return;
+    }
+
+    $('dot').className = 'dot on';
+    $('state').textContent = pad.id.slice(0, 28);
+
+    if (cells.length !== pad.buttons.length) buildGrid(pad.buttons.length);
+
+    let pressed = [];
+    pad.buttons.forEach((b, i) => {
+      const on = b.pressed || b.value > 0.5;
+      cells[i] && cells[i].classList.toggle('on', on);
+      if (on) pressed.push('N' + i);
+    });
+
+    $('cur').innerHTML = pressed.length
+      ? pressed.map((p) => `<span class="idx">${p}</span>`).join(' + ')
+      : '—';
+
+    $('axes').textContent = pad.axes
+      .map((v, i) => '轴' + i + '=' + v.toFixed(2))
+      .join('   ');
+
+    requestAnimationFrame(poll);
+  }
+
+  window.addEventListener('gamepadconnected', (e) => {
+    $('tip').textContent = '已连接：' + e.gamepad.id;
+  });
+  window.addEventListener('gamepaddisconnected', () => {
+    $('tip').textContent = '手柄已断开（蓝牙手柄休眠后会断开，按一下键即可）';
+  });
+
+  if (!navigator.getGamepads) {
+    $('tip').textContent = '当前浏览器不支持 Gamepad API，请用 Edge 或 Chrome 打开';
+  }
+  poll();
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>手柄控制 · 按键重映射</title>
+<link rel="stylesheet" href="web/style.css?v=20261029f">
+</head>
+<body>
+
+<header class="topbar">
+  <div class="brand"><span class="mark">GP</span>手柄控制</div>
+  <span class="pill"><span class="dot" id="connDot"></span><span id="connText">未连接</span></span>
+  <span class="spacer"></span>
+  <a class="btn ghost" href="web/tester.html">按键测试</a>
+  <button class="btn primary" id="btnConnect">连接手柄</button>
+  <button class="btn" id="btnDisconnect" disabled>断开</button>
+</header>
+
+<main class="wrap">
+
+  <!-- 设备状态条 -->
+  <section class="stats">
+    <div class="stat"><span class="k">型号</span><span class="v" id="dvModel">—</span></div>
+    <div class="stat"><span class="k">固件</span><span class="v" id="dvFw">—</span></div>
+    <div class="stat"><span class="k">VID / PID</span><span class="v" id="dvVidPid">—</span></div>
+    <div class="stat"><span class="k">类型 / 协议</span><span class="v" id="dvType">—</span></div>
+    <div class="stat grow"><span class="k">设备</span><span class="v dim" id="devName">未连接</span></div>
+  </section>
+
+  <div class="grid">
+
+    <!-- 按键映射 -->
+    <section class="card">
+      <header class="card-head">
+        <h2>按键映射</h2>
+        <span class="meta" id="mapCount"></span>
+      </header>
+      <div id="btnList"></div>
+    </section>
+
+    <!-- 编辑 -->
+    <aside class="card edit" id="editCard">
+      <header class="card-head">
+        <h2>编辑映射</h2>
+        <span class="meta"><button class="linkbtn" id="btnResetAll">重置为默认</button></span>
+      </header>
+
+      <div id="editEmpty" class="empty">
+        <div class="ring"></div>
+        <div>点一下左侧的按键<br>开始修改映射</div>
+      </div>
+
+      <div id="editBody" style="display:none">
+        <div class="sel-head">
+          <span class="sel-from" id="edBtn"></span>
+          <span class="arrow">→</span>
+          <span class="sel-to" id="edTarget">—</span>
+        </div>
+
+        <div class="field">
+          <div class="lb"><span>映射到</span></div>
+          <select id="edKey"></select>
+        </div>
+
+        <div class="field">
+          <div class="lb"><span>连击</span><b id="tbModeName">关闭</b></div>
+          <div class="seg" id="turboSeg">
+            <button data-mode="0">关闭</button>
+            <button data-mode="1">连击</button>
+            <button data-mode="2">自动连击</button>
+          </div>
+        </div>
+
+        <div class="field" id="turboFreqField" style="display:none">
+          <div class="lb"><span>连击频率</span><b id="tbCycleVal">5</b></div>
+          <input type="range" id="turboFreq" min="1" max="7" step="1" value="5">
+        </div>
+
+        <div id="modField" style="display:none"></div>
+
+        <div class="row mt">
+          <button class="btn primary grow" id="btnApply">应用到草稿</button>
+          <button class="btn" id="btnReset">还原</button>
+        </div>
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="preset-row">
+        <button class="btn" id="btnExport">导出预设</button>
+        <button class="btn" id="btnImport">导入预设</button>
+      </div>
+      <input type="file" id="fileInput" accept="application/json" style="display:none">
+      <p class="hint">每次连接都会载入默认映射；「保存到设备」会一次写入全部 20 个按键。</p>
+    </aside>
+  </div>
+
+  <!-- 日志 -->
+  <section class="card logs">
+    <header class="card-head">
+      <h2>通信日志</h2>
+      <span class="meta">
+        <button class="linkbtn" id="btnClearLog">清空</button>
+        <button class="btn primary" id="btnSave" disabled>保存到设备</button>
+      </span>
+    </header>
+    <div class="log" id="log"></div>
+  </section>
+</main>
+
+<script src="proto/frame.js?v=20261029f"></script>
+<script src="proto/keymap.js?v=20261029f"></script>
+<script src="proto/commands.js?v=20261029f"></script>
+<script src="proto/mapping.js?v=20261029f"></script>
+<script src="proto/turbo.js?v=20261029f"></script>
+<script src="web/ble.js?v=20261029f"></script>
+<script src="web/app.js?v=20261029f"></script>
+</body>
+</html>
